@@ -49,7 +49,7 @@ const surveyQuestions = {
     { id: 'stability', question: 'How important is job stability to you?', options: ['Not Important', 'Somewhat Important', 'Moderately Important', 'Very Important', 'Critical'] },
     { id: 'growth', question: 'How important are growth and advancement opportunities?', options: ['Not Important', 'Somewhat Important', 'Moderately Important', 'Very Important', 'Critical'] },
     { id: 'balance', question: 'How important is work-life balance to you?', options: ['Not Important', 'Somewhat Important', 'Moderately Important', 'Very Important', 'Critical'] },
-    { id: 'culture', question: 'How important is company culture to you?', options: ['Not Important', 'Somewhat Important', 'Moderately Important', 'Very Important', 'Critical'] }
+    { id: 'culture', question: 'How important is company culture to you?', options: ['Not Important', 'Somewhat Important', 'Moderately Important', 'Very Important', 'Extremely Important'] }
   ]
 };
 
@@ -209,4 +209,3 @@ const Survey = () => {
 };
 
 export default Survey;
-

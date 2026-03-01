@@ -1,328 +1,257 @@
-
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const SurveyResult = require('../models/SurveyResult');
-const User = require('../models/User');
 const Career = require('../models/Career');
+const SurveyResult = require('../models/SurveyResult');
 
-// Career categories and their keywords
-const skillCategories = {
-  'Technical': ['programming', 'coding', 'software', 'computer', 'technical', 'engineering', 'data', 'analysis', 'math', 'scientific'],
-  'Creative': ['creative', 'design', 'art', 'writing', 'music', 'visual', 'artistic', 'innovative', 'imaginative'],
-  'Communication': ['communication', 'speaking', 'writing', 'presentation', 'teaching', 'counseling', 'people', 'social'],
-  'Leadership': ['leadership', 'management', 'decision', 'organization', 'planning', 'supervising', 'directing'],
-  'Problem Solving': ['problem', 'critical', 'analytical', 'logical', 'research', 'troubleshooting', 'debugging']
+const streamMapping = {
+  Arts: ['design', 'artist', 'creative', 'media', 'arts', 'graphic', 'interior', 'photographer', 'video', 'music'],
+  Commerce: ['business', 'finance', 'marketing', 'account', 'commerce', 'management', 'entrepreneur', 'banker', 'analyst', 'hr'],
+  Science: ['science', 'research', 'biological', 'chemical', 'physics', 'environmental', 'lab', 'biotechnologist'],
+  Technology: ['software', 'developer', 'data', 'analysis', 'developer', 'cybersecurity', 'cloud', 'ux', 'engineer'],
+  Healthcare: ['healthcare', 'nurse', 'doctor', 'therapist', 'medical', 'physical', 'clinical'],
+  Education: ['education', 'teacher', 'instructional', 'tutor', 'teaching'],
+  Engineering: ['engineer', 'mechanical', 'civil', 'electrical', 'aerospace', 'cad']
 };
 
-const interestCategories = ['Technology', 'Business', 'Healthcare', 'Arts', 'Science', 'Education', 'Engineering', 'Finance', 'Marketing', 'Social Services'];
-
-const personalityTypes = {
-  'Analytical': ['analytical', 'logical', 'detail', 'systematic'],
-  'Creative': ['creative', 'imaginative', 'artistic', 'flexible'],
-  'Social': ['social', 'helping', 'teaching', 'teamwork', 'communication'],
-  'Leadership': ['leadership', 'leader', 'decision', 'assertive', 'ambitious'],
-  'Practical': ['practical', 'hands-on', 'physical', 'realistic', 'technical']
-};
-
-const workEnvironmentTypes = {
-  'Office': ['office', 'corporate', 'structured', 'indoor'],
-  'Remote': ['remote', 'flexible', 'home', 'digital', 'virtual'],
-  'Outdoor': ['outdoor', 'field', 'physical', 'environment'],
-  'Fast-paced': ['fast', 'dynamic', 'high-pressure', 'deadline'],
-  'Collaborative': ['team', 'collaborative', 'group', 'social'],
-  'Independent': ['independent', 'alone', 'self-directed', 'autonomous'],
-  'Startup': ['startup', 'innovative', 'flexible', 'casual'],
-  'Large Company': ['large', 'corporate', 'established', 'structured']
-};
-
-// AI Career Matching Algorithm - Improved Version
 const calculateCareerMatches = (answers, careers) => {
-  const { skills, interests, personality, workEnvironment } = answers;
+  // Calculate scores for each category
+  const scores = {
+    Arts: 0,
+    Commerce: 0,
+    Science: 0,
+    Technology: 0,
+    Healthcare: 0,
+    Education: 0,
+    Engineering: 0
+  };
+
+  // Process skills answers
+  if (answers.skills) {
+    Object.entries(answers.skills).forEach(([key, value]) => {
+      const numValue = Number(value) || 0;
+      if (key === 'programming' || key === 'technical' || key === 'analytical') {
+        scores.Technology += numValue;
+        scores.Engineering += numValue;
+      }
+      if (key === 'creative') {
+        scores.Arts += numValue;
+      }
+      if (key === 'communication' || key === 'teamwork') {
+        scores.Commerce += numValue;
+        scores.Healthcare += numValue;
+        scores.Education += numValue;
+      }
+      if (key === 'leadership') {
+        scores.Commerce += numValue;
+      }
+      if (key === 'math' || key === 'analytical') {
+        scores.Science += numValue;
+        scores.Technology += numValue;
+      }
+      if (key === 'research') {
+        scores.Science += numValue;
+        scores.Education += numValue;
+      }
+    });
+  }
+
+  // Process interests answers
+  if (answers.interests) {
+    Object.entries(answers.interests).forEach(([key, value]) => {
+      const numValue = Number(value) || 0;
+      if (key === 'technology') {
+        scores.Technology += numValue;
+        scores.Engineering += numValue;
+      }
+      if (key === 'business' || key === 'finance') {
+        scores.Commerce += numValue;
+      }
+      if (key === 'healthcare') {
+        scores.Healthcare += numValue;
+      }
+      if (key === 'arts' || key === 'creative') {
+        scores.Arts += numValue;
+      }
+      if (key === 'science') {
+        scores.Science += numValue;
+      }
+      if (key === 'education') {
+        scores.Education += numValue;
+      }
+      if (key === 'marketing') {
+        scores.Commerce += numValue;
+        scores.Arts += numValue;
+      }
+      if (key === 'social') {
+        scores.Healthcare += numValue;
+        scores.Education += numValue;
+        scores.Commerce += numValue;
+      }
+    });
+  }
+
+  // Process personality answers
+  if (answers.personality) {
+    Object.entries(answers.personality).forEach(([key, value]) => {
+      const numValue = Number(value) || 0;
+      if (key === 'introvert_extrovert' && numValue >= 4) {
+        scores.Commerce += numValue * 0.5;
+      }
+      if (key === 'risk' && numValue >= 4) {
+        scores.Commerce += numValue;
+        scores.Arts += numValue * 0.5;
+      }
+      if (key === 'empathetic') {
+        scores.Healthcare += numValue;
+        scores.Education += numValue;
+      }
+      if (key === 'innovative') {
+        scores.Technology += numValue;
+        scores.Arts += numValue;
+        scores.Engineering += numValue;
+      }
+    });
+  }
+
+  // Process work environment answers
+  if (answers.workEnvironment) {
+    Object.entries(answers.workEnvironment).forEach(([key, value]) => {
+      const numValue = Number(value) || 0;
+      if (key === 'remote') {
+        scores.Technology += numValue * 0.5;
+        scores.Arts += numValue * 0.5;
+      }
+      if (key === 'stability') {
+        scores.Healthcare += numValue;
+        scores.Education += numValue;
+        scores.Commerce += numValue * 0.5;
+      }
+      if (key === 'growth') {
+        scores.Commerce += numValue;
+        scores.Technology += numValue;
+      }
+    });
+  }
+
+  // Calculate total to normalize scores
+  const total = Object.values(scores).reduce((a, b) => a + b, 0);
   
-  // Analyze user's skill preferences based on their answers
-  const userSkillProfile = analyzeSkillAnswers(skills || {});
-  const userInterestProfile = analyzeInterestAnswers(interests || {});
-  const userPersonalityProfile = analyzePersonalityAnswers(personality || {});
-  const userEnvironmentProfile = analyzeEnvironmentAnswers(workEnvironment || {});
+  // Get a random seed based on answer values for variety
+  const answerSeed = JSON.stringify(answers).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   
-  // Score each career
-  const scoredCareers = careers.map(career => {
-    // Match skills
-    let skillScore = 0;
-    const careerSkills = career.skills.map(s => s.toLowerCase());
-    Object.entries(userSkillProfile).forEach(([category, score]) => {
-      if (score > 50) { // User prefers this category
-        const categoryKeywords = skillCategories[category] || [];
-        const match = careerSkills.some(skill => 
-          categoryKeywords.some(kw => skill.includes(kw))
-        );
-        if (match) skillScore += score;
+  // If total is 0 (all answers same), create varied scores based on seed
+  let normalizedScores;
+  if (total === 0) {
+    // Create varied but deterministic scores based on the seed
+    const base = 0.1;
+    const variance = 0.03;
+    const seed = (answerSeed % 100) / 100;
+    
+    normalizedScores = {
+      Arts: base + Math.sin(seed * 7) * variance,
+      Commerce: base + Math.sin(seed * 3) * variance,
+      Science: base + Math.sin(seed * 5) * variance,
+      Technology: base + Math.sin(seed * 2) * variance,
+      Healthcare: base + Math.sin(seed * 6) * variance,
+      Education: base + Math.sin(seed * 4) * variance,
+      Engineering: base + Math.sin(seed * 1) * variance
+    };
+    
+    // Re-normalize to ensure they sum to 1
+    const sum = Object.values(normalizedScores).reduce((a, b) => a + b, 0);
+    Object.keys(normalizedScores).forEach(key => {
+      normalizedScores[key] = normalizedScores[key] / sum;
+    });
+  } else {
+    normalizedScores = {
+      Arts: scores.Arts / total,
+      Commerce: scores.Commerce / total,
+      Science: scores.Science / total,
+      Technology: scores.Technology / total,
+      Healthcare: scores.Healthcare / total,
+      Education: scores.Education / total,
+      Engineering: scores.Engineering / total
+    };
+  }
+
+  console.log("Normalized Scores:", normalizedScores);
+
+  // Calculate career matches
+  const scored = careers.map(career => {
+    const text = (career.name + " " + career.category + " " + career.skills.join(" ")).toLowerCase();
+    
+    let score = 30; // Minimum baseline score
+
+    // Check each stream for matches - binary scoring (1 point per stream)
+    Object.entries(streamMapping).forEach(([stream, keywords]) => {
+      const hasMatch = keywords.some(keyword => text.includes(keyword));
+      if (hasMatch) {
+        score += normalizedScores[stream] * 80;
       }
     });
-    skillScore = Math.min(skillScore, 100);
-    
-    // Match interests
-    let interestScore = 0;
-    const careerCategory = career.category.toLowerCase();
-    Object.entries(userInterestProfile).forEach(([interest, score]) => {
-      if (score > 30 && interest.toLowerCase().includes(careerCategory)) {
-        interestScore += score;
-      }
-    });
-    // Add bonus if career category matches user's top interest
-    const topInterest = Object.entries(userInterestProfile).sort((a, b) => b[1] - a[1])[0];
-    if (topInterest && topInterest[0].toLowerCase() === careerCategory) {
-      interestScore += 30;
-    }
-    interestScore = Math.min(interestScore, 100);
-    
-    // Match personality
-    let personalityScore = 0;
-    const careerPersonality = career.personality.map(p => p.toLowerCase());
-    Object.entries(userPersonalityProfile).forEach(([type, score]) => {
-      if (score > 50) {
-        const typeKeywords = personalityTypes[type] || [];
-        const match = careerPersonality.some(p => 
-          typeKeywords.some(kw => p.includes(kw))
-        );
-        if (match) personalityScore += score;
-      }
-    });
-    personalityScore = Math.min(personalityScore, 100);
-    
-    // Match work environment
-    let environmentScore = 0;
-    const careerEnv = career.workEnvironment.map(e => e.toLowerCase());
-    Object.entries(userEnvironmentProfile).forEach(([env, score]) => {
-      if (score > 50) {
-        const envKeywords = workEnvironmentTypes[env] || [];
-        const match = careerEnv.some(e => 
-          envKeywords.some(kw => e.includes(kw))
-        );
-        if (match) environmentScore += score;
-      }
-    });
-    environmentScore = Math.min(environmentScore, 100);
-    
-    // Calculate weighted overall score
-    const overallScore = (
-      (skillScore * 0.30) +
-      (interestScore * 0.25) +
-      (personalityScore * 0.25) +
-      (environmentScore * 0.20)
-    );
-    
+
     return {
       career: career._id,
       careerName: career.name,
-      matchScore: Math.max(Math.min(Math.round(overallScore), 99), 10), // Keep between 10-99
-      description: career.description,
-      salaryRange: `$${career.salaryMin.toLocaleString()} - $${career.salaryMax.toLocaleString()}`,
-      education: career.education,
-      growthRate: career.growthRate,
       category: career.category,
-      // Include breakdown for debugging
-      breakdown: { skillScore, interestScore, personalityScore, environmentScore }
+      matchScore: Math.min(Math.round(score), 95),
+      description: career.description,
+      salaryRange: `$${career.salaryMin?.toLocaleString() || 'N/A'} - $${career.salaryMax?.toLocaleString() || 'N/A'}`,
+      education: career.education,
+      growthRate: career.growthRate
     };
   });
-  
-  // Sort by match score and return top 10
-  return scoredCareers
-    .sort((a, b) => b.matchScore - a.matchScore)
-    .slice(0, 10);
-};
 
-// Analyze skill answers to build user profile
-const analyzeSkillAnswers = (answers) => {
-  const profile = {};
-  const userAnswers = answers || {};
-  const categoryKeys = Object.keys(skillCategories);
-  
-  // Get all answer values from skills object (which has keys like 'programming', 'analytical', etc.)
-  const answerValues = Object.values(userAnswers);
-  
-  if (answerValues.length === 0) {
-    // Return default profile if no answers
-    categoryKeys.forEach(key => {
-      profile[key] = 50;
-    });
-    return profile;
-  }
-  
-  // Map each answer to a category based on its position
-  Object.entries(userAnswers).forEach(([key, value], index) => {
-    const score = parseInt(value) || 50;
-    const category = categoryKeys[index % categoryKeys.length];
-    if (!profile[category]) profile[category] = [];
-    profile[category].push(score);
-  });
-  
-  // Average the scores per category
-  Object.keys(profile).forEach(key => {
-    profile[key] = profile[key].reduce((a, b) => a + b, 0) / profile[key].length;
-  });
-  
-  return profile;
-};
-
-// Analyze interest answers
-const analyzeInterestAnswers = (answers) => {
-  const profile = {};
-  const userAnswers = answers || {};
-  
-  // Get all answer values from interests object
-  const answerValues = Object.values(userAnswers);
-  
-  if (answerValues.length === 0) {
-    // Return default profile if no answers
-    interestCategories.forEach(interest => {
-      profile[interest] = 50;
-    });
-    return profile;
-  }
-  
-  // Map each answer to an interest based on its position
-  Object.entries(userAnswers).forEach(([key, value], index) => {
-    const score = parseInt(value) || 50;
-    const interest = interestCategories[index % interestCategories.length];
-    profile[interest] = score;
-  });
-  
-  return profile;
-};
-
-// Analyze personality answers
-const analyzePersonalityAnswers = (answers) => {
-  const profile = {};
-  const userAnswers = answers || {};
-  const typeKeys = Object.keys(personalityTypes);
-  
-  // Get all answer values from personality object
-  const answerValues = Object.values(userAnswers);
-  
-  if (answerValues.length === 0) {
-    // Return default profile if no answers
-    typeKeys.forEach(type => {
-      profile[type] = 50;
-    });
-    return profile;
-  }
-  
-  // Map each answer to a personality type based on its position
-  Object.entries(userAnswers).forEach(([key, value], index) => {
-    const score = parseInt(value) || 50;
-    const type = typeKeys[index % typeKeys.length];
-    if (!profile[type]) profile[type] = [];
-    profile[type].push(score);
-  });
-  
-  // Average per type
-  Object.keys(profile).forEach(key => {
-    profile[key] = profile[key].reduce((a, b) => a + b, 0) / profile[key].length;
-  });
-  
-  return profile;
-};
-
-// Analyze work environment answers
-const analyzeEnvironmentAnswers = (answers) => {
-  const profile = {};
-  const userAnswers = answers || {};
-  const envKeys = Object.keys(workEnvironmentTypes);
-  
-  // Get all answer values from workEnvironment object
-  const answerValues = Object.values(userAnswers);
-  
-  if (answerValues.length === 0) {
-    // Return default profile if no answers
-    envKeys.forEach(env => {
-      profile[env] = 50;
-    });
-    return profile;
-  }
-  
-  // Map each answer to an environment type based on its position
-  Object.entries(userAnswers).forEach(([key, value], index) => {
-    const score = parseInt(value) || 50;
-    const env = envKeys[index % envKeys.length];
-    if (!profile[env]) profile[env] = [];
-    profile[env].push(score);
-  });
-  
-  // Average per type
-  Object.keys(profile).forEach(key => {
-    profile[key] = profile[key].reduce((a, b) => a + b, 0) / profile[key].length;
-  });
-  
-  return profile;
+  return scored.sort((a, b) => b.matchScore - a.matchScore).slice(0, 5);
 };
 
 // @route   POST /api/survey/submit
-// @desc    Submit survey answers and get career matches
+// @desc    Submit survey answers and get career recommendations
 // @access  Private
 router.post('/submit', protect, async (req, res) => {
   try {
-    const { answers } = req.body;
-    
-    if (!answers) {
-      return res.status(400).json({ message: 'Please provide survey answers' });
-    }
-    
-    // Get all careers from database
+    const answers = req.body;
+
     const careers = await Career.find({});
-    
+
     if (careers.length === 0) {
-      return res.status(400).json({ message: 'No careers found in database. Please seed the database first.' });
+      return res.status(404).json({ message: 'No careers found in database' });
     }
-    
-    // Calculate career matches using AI algorithm
+
     const results = calculateCareerMatches(answers, careers);
-    
-    // Save survey result
-    const surveyResult = await SurveyResult.create({
+
+    await SurveyResult.create({
       user: req.user._id,
       answers,
       results
     });
-    
-    // Update user's assessment count
-    await User.findByIdAndUpdate(req.user._id, {
-      $inc: { assessmentCount: 1 },
-      $push: { savedResults: surveyResult._id }
-    });
-    
-    res.status(201).json({
-      _id: surveyResult._id,
-      results,
-      createdAt: surveyResult.createdAt
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
+
+    res.json({ results });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 // @route   GET /api/survey/results/:id
-// @desc    Get survey results by ID
+// @desc    Get specific survey result by ID
 // @access  Private
 router.get('/results/:id', protect, async (req, res) => {
   try {
-    const surveyResult = await SurveyResult.findById(req.params.id);
-    
-    if (!surveyResult) {
-      return res.status(404).json({ message: 'Survey result not found' });
+    const result = await SurveyResult.findOne({
+      _id: req.params.id,
+      user: req.user._id
+    }).populate('results.career');
+
+    if (!result) {
+      return res.status(404).json({ message: 'Result not found' });
     }
-    
-    // Check if user owns this result
-    if (surveyResult.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to view this result' });
-    }
-    
-    res.json(surveyResult);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -331,35 +260,35 @@ router.get('/results/:id', protect, async (req, res) => {
 // @access  Private
 router.get('/history', protect, async (req, res) => {
   try {
-    const surveyResults = await SurveyResult.find({ user: req.user._id })
+    const history = await SurveyResult.find({ user: req.user._id })
       .sort({ createdAt: -1 })
-      .select('results createdAt');
-    
-    res.json(surveyResults);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
+      .limit(10);
+
+    res.json(history);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
 // @route   GET /api/survey/latest-results
-// @desc    Get user's latest survey results
+// @desc    Get user's latest survey result
 // @access  Private
 router.get('/latest-results', protect, async (req, res) => {
   try {
-    const surveyResult = await SurveyResult.findOne({ user: req.user._id })
-      .sort({ createdAt: -1 });
-    
-    if (!surveyResult) {
-      return res.json(null);
+    const latestResult = await SurveyResult.findOne({ user: req.user._id })
+      .sort({ createdAt: -1 })
+      .populate('results.career');
+
+    if (!latestResult) {
+      return res.status(404).json({ message: 'No results found' });
     }
-    
-    res.json(surveyResult);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
+
+    res.json(latestResult);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
 module.exports = router;
-
