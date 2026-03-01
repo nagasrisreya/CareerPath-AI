@@ -261,10 +261,6 @@ The application is fully responsive with breakpoints:
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📞 Support
-
-For support or questions, please open an issue on GitHub or contact the development team.
-
 ---
 
 **Built with ❤️ for career exploration and personal growth**
